@@ -1,1 +1,142 @@
-<!DOCTYPE html><html lang=ko><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><title>S50</title></head><body>Live: https://s50-kspo-muzly.vercel.app</body></html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0f0c"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>S50</title>
+<style>
+html,body{margin:0;background:#0a0f0c;color:#f4f4f5;font-family:system-ui,sans-serif}
+.wrap{max-width:28rem;margin:0 auto;min-height:100dvh;padding:20px 16px 80px}
+.lime{color:#b6ff3b} .muted{color:#a1a1aa;font-size:12px}
+.card{background:#121a15;border:1px solid #1e2b23;border-radius:16px;padding:16px;margin:12px 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+button{font:inherit;cursor:pointer}
+.btn{width:100%;border:0;border-radius:12px;padding:12px;font-weight:800;background:#b6ff3b;color:#0a0f0c;margin-top:10px}
+.btn2{width:100%;border:1px solid #1e2b23;border-radius:12px;padding:12px;background:none;color:#d4d4d8;margin-top:8px}
+input{background:#0a0f0c;border:1px solid #1e2b23;border-radius:8px;color:#fff;padding:8px;width:100%;box-sizing:border-box}
+nav{position:fixed;left:0;right:0;bottom:0;max-width:28rem;margin:auto;background:#0e1511;border-top:1px solid #1e2b23;display:flex}
+nav button{flex:1;background:none;border:0;color:#71717a;padding:12px;font-size:12px}
+nav button.on{color:#b6ff3b;font-weight:800}
+h1{margin:4px 0 12px;font-size:24px}
+.bar{height:8px;background:#1e2b23;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:#b6ff3b}
+.clock{font-size:40px;font-weight:900;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<nav id="nav"></nav>
+<script>
+const KEY="s50.kspo.v2";
+const L={
+ squat:["바벨 스쿰트","랭","대퇴·둔근","세이프티=허벽지. 무릎=발끝. 고관절 뒤로."],
+ bench:["바벨 벤치","랭","흉근","견갑 고정. 바=쫓꼬지. 어깨 말림 금지."],
+ dead:["데드리프트","플랫폼","슬굴곡·둔근","바=정강이. 등 중립. 같이 상승."],
+ chest:["체스트프레스","머신","흉근","손잡이=가슴 중하단. 2초 하강."],
+ lat:["랫풀다운","머신","광배","바=쇠골 앞. 어깨 내림."],
+ lcurl:["레그컬","머신","슬굴곡","무릎=캠축. 골반 고정."],
+ lext:["레그익스텐션","머신","대퇴","튀김 금지. 상단 1초."],
+ row:["시티드 로우","케이블","중부승모","몸통 고정. 팔꾼치만."]
+};
+const T=[{id:"A",t1:"squat",t2:"lcurl",t3:"lext"},{id:"B",t1:"bench",t2:"chest",t3:"lat"},{id:"C",t1:"dead",t2:"lat",t3:"row"},{id:"D",t1:"squat",t2:"lext",t3:"lcurl"}];
+const def=()=>({loads:{squat:90,bench:70,dead:90,chest:40,lat:40,lcurl:30,lext:35,row:40},logs:[],streak:0,lastDate:null,next:0,body:[{d:today(),kg:72.5,bf:13}],voice:true,sug:true,ses:null});
+let S=load(), tab="home", view="home", tick=null, restT=null;
+function today(){const d=new Date(),z=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())}
+function load(){try{return Object.assign(def(),JSON.parse(localStorage.getItem(KEY)||"{}"))}catch{return def()}}
+function save(){localStorage.setItem(KEY,JSON.stringify(S))}
+function mmss(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function plan(){const t=T[S.next%4];return {id:t.id,items:[["T1",t.t1,5,5,150],["T2",t.t2,3,10,60],["T3",t.t3,3,12,60]]}}
+function beep(){try{const c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);g.gain.value=.05;o.frequency.value=880;o.start();setTimeout(()=>{o.stop();c.close()},160)}catch{}}
+function speak(t){if(!S.voice)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang="ko-KR";speechSynthesis.speak(u)}catch{}}
+function go(mini){
+  const p=plan();
+  const items=(mini?[p.items[0]]:[...p.items]).map(x=>({slot:x[0],id:x[1],name:L[x[1]][0],sets:mini?3:x[2],reps:x[3],rest:x[4],kg:S.loads[x[1]]||20,done:[]}));
+  S.ses={mini,id:p.id,left:mini?900:3000,run:1,phase:"work",idx:0,set:0,items,shots:[]};
+  view="ses"; speak(items[0].name+" 시작"); loop(); render();
+}
+function loop(){clearInterval(tick);tick=setInterval(()=>{if(!S.ses||!S.ses.run)return;S.ses.left=Math.max(0,S.ses.left-1);const el=document.getElementById("clk");if(el)el.textContent=mmss(S.ses.left);if(!S.ses.left){S.ses.run=0;speak("종료")}},1000)}
+function doneSet(){
+  const se=S.ses,it=se.items[se.idx];
+  const kg=+document.getElementById("kg").value, rp=+document.getElementById("rp").value;
+  it.done.push({kg,rp}); S.loads[it.id]=kg;
+  if(it.done.length>=it.sets && se.idx>=se.items.length-1) return finish();
+  if(it.done.length>=it.sets){se.idx++;se.set=0} else se.set++;
+  se.phase="rest"; se.rest=it.rest; beep(); speak("휴식 "+it.rest+"초"); startRest(); render();
+}
+function startRest(){clearInterval(restT);restT=setInterval(()=>{if(!S.ses||S.ses.phase!="rest")return;S.ses.rest--;const el=document.getElementById("rclk");if(el)el.textContent=mmss(Math.max(0,S.ses.rest));if(S.ses.rest<=0){clearInterval(restT);S.ses.phase="work";beep();speak("세트 시작");render()}},1000)}
+function finish(){
+  clearInterval(tick);clearInterval(restT);
+  const se=S.ses;
+  S.logs.push({d:today(),id:se.id,mini:se.mini,min:Math.max(1,Math.round((3000-se.left)/60)),items:se.items.map(i=>({n:i.name,kg:i.kg})),shots:se.shots||[]});
+  if(S.lastDate!==today()) S.streak=(S.lastDate?S.streak+1:1);
+  S.lastDate=today(); S.next=(S.next+1)%4; S.ses=null; view="home"; save(); speak("저장"); render();
+}
+function addShot(file, arr){
+  const img=new Image(), u=URL.createObjectURL(file);
+  img.onload=()=>{const c=document.createElement("canvas");const m=640,s=Math.max(img.width,img.height);c.width=img.width/s*m;c.height=img.height/s*m;c.getContext("2d").drawImage(img,0,0,c.width,c.height);arr.push(c.toDataURL("image/jpeg",.65));URL.revokeObjectURL(u);render()};
+  img.src=u;
+}
+function nav(){return `<nav>${[["home","홈"],["log","기록"],["my","MY"]].map(([k,v])=>`<button class="${tab===k?"on":""}" data-t="${k}">${v}</button>`).join("")}</nav>`}
+function home(){
+  const p=plan(), tot=S.loads.squat+S.loads.bench+S.loads.dead, pct=Math.min(100,Math.round(tot/340*100));
+  return `<div class="muted lime">S50 · OSC</div><h1>50분 스트렉스</h1>
+  <div class="grid3"><div class="card"><div class="muted">3대</div><b>${tot}kg</b></div><div class="card"><div class="muted">목표</div><b>340</b></div><div class="card"><div class="muted">연속</div><b>${S.streak}일</b></div></div>
+  <div class="bar"><i style="width:${pct}%"></i></div>
+  <div class="card"><div class="muted">오늘 ${p.id}</div>
+  ${p.items.map(x=>`<div class="row" style="margin:8px 0"><div><b>${x[0]} ${L[x[1]][0]}</b><div class="muted">${L[x[1]][2]} · ${S.loads[x[1]]}kg</div><div class="muted">${L[x[1]][3]}</div></div></div>`).join("")}
+  <button class="btn" id="go">워밍업 없이 50분</button>
+  <button class="btn2" id="mini">피곤하다 · 15분</button></div>`;
+}
+function sesV(){
+  const se=S.ses,it=se.items[se.idx];
+  return `<div class="row"><button class="btn2" id="abort" style="width:auto;padding:8px 12px">종료</button>
+  <div class="clock" id="clk">${mmss(se.left)}</div>
+  <button class="btn2" id="pause" style="width:auto;padding:8px 12px">${se.run?"정지":"재개"}</button></div>
+  <div class="card"><div class="lime">${it.slot} · ${it.done.length+1}/${it.sets}</div><h1>${it.name}</h1>
+  <p class="muted">${L[it.id][3]}</p>
+  <div class="muted">기록 사진 ${(se.shots||[]).length}/3</div>
+  <div class="row">${(se.shots||[]).map(s=>`<img src="${s}" style="width:64px;height:80px;object-fit:cover;border-radius:8px">`).join("")}
+  ${(se.shots||[]).length<3?`<label class="btn2" style="width:64px;height:80px;display:flex;align-items:center;justify-content:center">촬영<input id="shot" type="file" accept="image/*" capture="environment" hidden></label>`:""}</div>
+  ${se.phase==="rest"?`<div class="clock lime" id="rclk">${mmss(se.rest)}</div><button class="btn2" id="skip">휴식 건너뛰기</button>`:
+  `<div class="row"><label class="muted">kg<input id="kg" type="number" value="${it.kg}"></label><label class="muted">reps<input id="rp" type="number" value="${it.reps}"></label></div>
+   <button class="btn" id="ds">${se.idx===se.items.length-1&&it.done.length+1>=it.sets?"저장":"세트 완료"}</button>`}
+  </div>${se.items.map((x,i)=>`<div class="muted">${i===se.idx?"▸ ":""}${x.slot} ${x.name} ${x.done.length}/${x.sets}</div>`).join("")}`;
+}
+function logV(){
+  const logs=[...S.logs].reverse();
+  return `<div class="muted lime">LOG</div><h1>기록</h1>`+(logs.length?logs.map(l=>`<div class="card">${l.shots&&l.shots[0]?`<img src="${l.shots[0]}" style="width:100%;height:160px;object-fit:cover;border-radius:8px">`:""}<div class="row"><b>${l.d}</b><span class="muted">${l.min}분 ${l.id}${l.mini?" 15분":""}</span></div><div class="muted">${l.items.map(i=>i.n+" "+i.kg+"kg").join(" / ")}</div></div>`).join(""):`<div class="card muted">기록 없음</div>`);
+}
+function myV(){
+  const b=S.body.at(-1);
+  return `<div class="muted lime">MY</div><h1>내 진행</h1>
+  <div class="card"><b>178cm · ${b.kg}kg · BF ${b.bf}%</b><div class="muted">KSPO OSC · 연속 ${S.streak}일</div></div>
+  <div class="card"><div class="muted">체중 / 체지방</div><div class="row"><input id="kgb" type="number" step="0.1" value="${b.kg}"><input id="bfb" type="number" step="0.1" value="${b.bf}" style="width:80px"><button class="btn" id="svb" style="width:auto">저장</button></div></div>
+  <div class="card"><label class="row">음성 코치 <input id="vo" type="checkbox" ${S.voice?"checked":""}></label></div>
+  <button class="btn2" id="wipe">데이터 초기화</button>`;
+}
+function render(){
+  document.getElementById("app").innerHTML = view==="ses"?sesV(): tab==="log"?logV(): tab==="my"?myV():home();
+  document.getElementById("nav").innerHTML = view==="ses"?"":nav();
+  bind();
+}
+function bind(){
+  document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+  document.getElementById("go")&&(document.getElementById("go").onclick=()=>go(0));
+  document.getElementById("mini")&&(document.getElementById("mini").onclick=()=>go(1));
+  document.getElementById("ds")&&(document.getElementById("ds").onclick=doneSet);
+  document.getElementById("abort")&&(document.getElementById("abort").onclick=()=>{if(confirm("종료?")){S.ses=null;view="home";render()}});
+  document.getElementById("pause")&&(document.getElementById("pause").onclick=()=>{S.ses.run=!S.ses.run;render()});
+  document.getElementById("skip")&&(document.getElementById("skip").onclick=()=>{clearInterval(restT);S.ses.phase="work";render()});
+  document.getElementById("shot")&&(document.getElementById("shot").onchange=e=>{const f=e.target.files[0];if(f) addShot(f,S.ses.shots)});
+  document.getElementById("svb")&&(document.getElementById("svb").onclick=()=>{S.body.push({d:today(),kg:+kgb.value,bf:+bfb.value});save();render()});
+  document.getElementById("vo")&&(document.getElementById("vo").onchange=e=>{S.voice=e.target.checked;save()});
+  document.getElementById("wipe")&&(document.getElementById("wipe").onclick=()=>{if(confirm("삭제?")){localStorage.removeItem(KEY);S=def();render()}});
+}
+if(S.ses&&S.ses.left>0){view="ses";loop();if(S.ses.phase==="rest")startRest()}
+render();
+</script>
+</body>
+</html>
